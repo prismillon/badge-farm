@@ -1,0 +1,19 @@
+[package]
+name = "badge-farm"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+discord_client_gateway = { git = "https://github.com/UwUDev/discord-client-rs", rev = "1b7d2c9d42bf263c39a231603838ce1541b26db1" }
+discord_client_rest = { git = "https://github.com/UwUDev/discord-client-rs", rev = "1b7d2c9d42bf263c39a231603838ce1541b26db1" }
+discord_client_structs = { git = "https://github.com/UwUDev/discord-client-rs", rev = "1b7d2c9d42bf263c39a231603838ce1541b26db1" }
+tokio = { version = "1.45.0", features = ["rt-multi-thread", "macros", "time", "signal"] }
+rand = "0.9"
+clap = { version = "4", features = ["derive"] }
+
+[patch.crates-io]
+wreq = { git = "https://github.com/0x676e67/wreq", rev = "cd76bcdf1307153de289d34e072528bdf0510a3b" }
+btls = { git = "https://github.com/0x676e67/btls", rev = "129887582a538b8f4dcf371d15c953335312ca37" }
+btls-sys = { git = "https://github.com/0x676e67/btls", rev = "129887582a538b8f4dcf371d15c953335312ca37" }
