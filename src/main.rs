@@ -1,8 +1,10 @@
+use clap::{Parser, ValueEnum};
+use discord_client_gateway::events::Event;
 use discord_client_gateway::gateway::GatewayClient;
 use discord_client_rest::rest::{RequestProperties, RestClient};
-use discord_client_structs::structs::channel::Channel;
 use discord_client_structs::structs::application::detectable::DetectableApplication;
-use clap::Parser;
+use discord_client_structs::structs::channel::Channel;
+use discord_client_structs::structs::user::status::StatusType;
 use rand::seq::SliceRandom;
 use std::time::Duration;
 
@@ -13,6 +15,23 @@ use tokio::time::{Instant, interval, sleep, sleep_until};
 const GAME_TIME_BADGE: u64 = 20;
 const GAME_VARIETY_BADGE: u64 = 21;
 const STREAMING_BADGE: u64 = 19;
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Status {
+    Online,
+    Idle,
+    Dnd,
+}
+
+impl From<Status> for StatusType {
+    fn from(status: Status) -> Self {
+        match status {
+            Status::Online => StatusType::Online,
+            Status::Idle => StatusType::AFK,
+            Status::Dnd => StatusType::DoNotDisturb,
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(about = "Farms Discord badge progress (Game Time, Game Variety, Streaming)")]
@@ -45,6 +64,10 @@ struct Cli {
     #[arg(short = 'c', long)]
     stream_channel: Option<u64>,
 
+    /// Status shown while farming
+    #[arg(short, long, value_enum, default_value_t = Status::Idle)]
+    status: Status,
+
     /// Leave any voice channel and exit
     #[arg(long)]
     leave: bool,
@@ -73,11 +96,9 @@ fn pick_games(all: Vec<DetectableApplication>, count: usize) -> Vec<DetectableAp
 async fn print_progress(rest: &RestClient) {
     match rest.user().get_badges().await {
         Ok(badges) => {
-            for badge in badges
-                .badges
-                .iter()
-                .filter(|b| [GAME_TIME_BADGE, GAME_VARIETY_BADGE, STREAMING_BADGE].contains(&b.badge_id))
-            {
+            for badge in badges.badges.iter().filter(|b| {
+                [GAME_TIME_BADGE, GAME_VARIETY_BADGE, STREAMING_BADGE].contains(&b.badge_id)
+            }) {
                 let progress = badge
                     .progress
                     .as_ref()
@@ -158,6 +179,7 @@ async fn main() {
         .connect()
         .await
         .expect("gateway connect");
+    gateway.status = cli.status.into();
 
     if cli.leave {
         gateway
@@ -193,6 +215,19 @@ async fn main() {
         tokio::select! {
             event = gateway.next_event() => match event {
                 Ok(event) => {
+                    match &event {
+                        Event::Ready(_) => {
+                            println!("[gateway] ready");
+                            if !games.is_empty() {
+                                let game = &games[index];
+                                if let Err(e) = gateway.set_game_activity(&game.name, game.id, None).await {
+                                    eprintln!("[farm] set activity failed: {e}");
+                                }
+                            }
+                        }
+                        Event::Resumed(_) => println!("[gateway] resumed"),
+                        _ => {}
+                    }
                     if let Some(stream) = stream.as_mut() {
                         stream.on_event(&event);
                         stream.step(&mut gateway).await;

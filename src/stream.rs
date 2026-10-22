@@ -121,7 +121,11 @@ impl StreamFarm {
                 self.set_phase(Phase::Creating);
                 gateway
                     .create_stream(
-                        if self.guild_id.is_some() { "guild" } else { "call" },
+                        if self.guild_id.is_some() {
+                            "guild"
+                        } else {
+                            "call"
+                        },
                         self.guild_id,
                         self.channel_id,
                         None,
@@ -141,10 +145,15 @@ impl StreamFarm {
         }
     }
 
-    async fn step_idle(&mut self, gateway: &mut GatewayClient) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn step_idle(
+        &mut self,
+        gateway: &mut GatewayClient,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if let Some(channel) = self.voice_channel {
             if !self.waiting_logged {
-                println!("[stream] account already in voice channel {channel}, waiting for it to leave");
+                println!(
+                    "[stream] account already in voice channel {channel}, waiting for it to leave"
+                );
                 self.waiting_logged = true;
             }
             return Ok(());

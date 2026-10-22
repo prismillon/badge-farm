@@ -6,9 +6,9 @@ edition = "2024"
 [workspace]
 
 [dependencies]
-discord_client_gateway = { git = "https://github.com/UwUDev/discord-client-rs", rev = "1b7d2c9d42bf263c39a231603838ce1541b26db1" }
-discord_client_rest = { git = "https://github.com/UwUDev/discord-client-rs", rev = "1b7d2c9d42bf263c39a231603838ce1541b26db1" }
-discord_client_structs = { git = "https://github.com/UwUDev/discord-client-rs", rev = "1b7d2c9d42bf263c39a231603838ce1541b26db1" }
+discord_client_gateway = { git = "https://github.com/UwUDev/discord-client-rs", rev = "f4ae9060aad750ed439f50009d440e1a9e3d1ea9" }
+discord_client_rest = { git = "https://github.com/UwUDev/discord-client-rs", rev = "f4ae9060aad750ed439f50009d440e1a9e3d1ea9" }
+discord_client_structs = { git = "https://github.com/UwUDev/discord-client-rs", rev = "f4ae9060aad750ed439f50009d440e1a9e3d1ea9" }
 tokio = { version = "1.45.0", features = ["rt-multi-thread", "macros", "time", "signal"] }
 rand = "0.9"
 clap = { version = "4", features = ["derive"] }
