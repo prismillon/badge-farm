@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 const STEP_TIMEOUT: Duration = Duration::from_secs(30);
 const RETRY_DELAY: Duration = Duration::from_secs(30);
+const SUPPLEMENTAL_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -25,6 +26,8 @@ pub struct StreamFarm {
     retry_at: Instant,
     stream_key: Option<String>,
     waiting_logged: bool,
+    ready_at: Option<Instant>,
+    supplemental_seen: bool,
 }
 
 impl StreamFarm {
@@ -40,6 +43,8 @@ impl StreamFarm {
             retry_at: Instant::now(),
             stream_key: None,
             waiting_logged: false,
+            ready_at: None,
+            supplemental_seen: false,
         }
     }
 
@@ -59,14 +64,22 @@ impl StreamFarm {
         key.ends_with(&format!(":{}", self.user_id))
     }
 
+    pub fn missing_supplemental(&self) -> bool {
+        self.ready_at
+            .is_some_and(|at| !self.supplemental_seen && at.elapsed() > SUPPLEMENTAL_TIMEOUT)
+    }
+
     pub fn on_event(&mut self, event: &Event) {
         match event {
             Event::Ready(_) => {
                 self.reset();
                 self.voice_known = true;
+                self.ready_at = Some(Instant::now());
+                self.supplemental_seen = false;
             }
             Event::ReadySupplemental(supplemental) => {
                 self.voice_known = true;
+                self.supplemental_seen = true;
                 self.voice_channel = supplemental
                     .guilds
                     .iter()

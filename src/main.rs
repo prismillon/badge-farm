@@ -459,49 +459,65 @@ async fn stream_only(
     game: Option<(String, u64)>,
     mut stop: tokio::sync::watch::Receiver<bool>,
 ) {
-    let mut gateway = loop {
-        let attempt = tokio::time::timeout(
-            Duration::from_secs(45),
-            GatewayClient::builder(token.clone()).desktop().connect(),
-        )
-        .await;
-        match attempt {
-            Ok(Ok(gateway)) => break gateway,
-            Ok(Err(e)) => eprintln!("[stream {channel}] connect failed: {e}"),
-            Err(_) => eprintln!("[stream {channel}] connect timed out"),
-        }
-        tokio::select! {
-            _ = sleep(Duration::from_secs(5)) => {}
-            _ = stop.changed() => return,
-        }
-    };
-    gateway.status = status.into();
-    if let Some((name, id)) = game {
-        if let Err(e) = gateway.set_game_activity(&name, id, None).await {
-            eprintln!("[stream {channel}] set activity failed: {e}");
-        }
-    }
-    let mut stream = StreamFarm::new(guild, channel, user_id);
-    let mut tick = interval(Duration::from_secs(1));
-
     loop {
-        tokio::select! {
-            event = gateway.next_event() => match event {
-                Ok(event) => {
-                    stream.on_event(&event);
-                    stream.step(&mut gateway).await;
-                }
-                Err(e) => {
-                    eprintln!("[stream {channel}] {e}");
-                    sleep(Duration::from_secs(5)).await;
-                }
-            },
-            _ = tick.tick() => stream.step(&mut gateway).await,
-            _ = stop.changed() => break,
+        let mut gateway = loop {
+            let attempt = tokio::time::timeout(
+                Duration::from_secs(45),
+                GatewayClient::builder(token.clone()).desktop().connect(),
+            )
+            .await;
+            match attempt {
+                Ok(Ok(gateway)) => break gateway,
+                Ok(Err(e)) => eprintln!("[stream {channel}] connect failed: {e}"),
+                Err(_) => eprintln!("[stream {channel}] connect timed out"),
+            }
+            tokio::select! {
+                _ = sleep(Duration::from_secs(5)) => {}
+                _ = stop.changed() => return,
+            }
+        };
+        gateway.status = status.into();
+        if let Some((name, id)) = game.clone() {
+            if let Err(e) = gateway.set_game_activity(&name, id, None).await {
+                eprintln!("[stream {channel}] set activity failed: {e}");
+            }
         }
-    }
+        let mut stream = StreamFarm::new(guild, channel, user_id);
+        let mut tick = interval(Duration::from_secs(1));
 
-    stream.stop(&mut gateway).await;
-    gateway.clear_game_activity().await.ok();
-    gateway.graceful_shutdown().await.ok();
+        let mut reconnect = false;
+        loop {
+            tokio::select! {
+                event = gateway.next_event() => match event {
+                    Ok(event) => {
+                        stream.on_event(&event);
+                        stream.step(&mut gateway).await;
+                    }
+                    Err(e) => {
+                        eprintln!("[stream {channel}] {e}");
+                        reconnect = true;
+                        break;
+                    }
+                },
+                _ = tick.tick() => {
+                    if stream.missing_supplemental() {
+                        eprintln!("[stream {channel}] no READY_SUPPLEMENTAL after 10s, reconnecting");
+                        reconnect = true;
+                        break;
+                    }
+                    stream.step(&mut gateway).await;
+                },
+                _ = stop.changed() => break,
+            }
+        }
+
+        stream.stop(&mut gateway).await;
+        gateway.clear_game_activity().await.ok();
+        gateway.graceful_shutdown().await.ok();
+
+        if !reconnect || *stop.borrow() {
+            return;
+        }
+        sleep(Duration::from_secs(2)).await;
+    }
 }
