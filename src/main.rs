@@ -66,6 +66,7 @@ async fn main() {
             &rest,
             cli.claim_games,
             cli.claim_hours,
+            cli.claim_heartbeat_min,
             cli.claim_batch,
             cli.claim_dry_run,
         )

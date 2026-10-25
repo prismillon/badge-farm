@@ -147,7 +147,7 @@ impl Ids {
                 game,
                 &session_id,
                 session.start + tracked,
-                tracked,
+                step,
                 false,
                 false,
             ));
@@ -156,7 +156,7 @@ impl Ids {
             game,
             &session_id,
             session.start + session.duration,
-            session.duration,
+            session.duration - tracked,
             false,
             true,
         ));
@@ -374,6 +374,7 @@ pub async fn claim(
     rest: &RestClient,
     count: usize,
     hours: f64,
+    hb_minutes: f64,
     batch: usize,
     dry_run: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -402,7 +403,7 @@ pub async fn claim(
             name: &app.name,
             exe,
         };
-        events.extend(ids.session_events(game, &session, hours * 60.0));
+        events.extend(ids.session_events(game, &session, hb_minutes));
     }
 
     println!(
