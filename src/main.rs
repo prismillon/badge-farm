@@ -161,9 +161,21 @@ async fn print_progress(rest: &RestClient) {
     }
 }
 
-async fn verify_gateway(
-    token: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+struct Ws {
+    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl Ws {
+    async fn close(mut self) {
+        if let Some(tx) = self.shutdown.take() {
+            tx.send(()).ok();
+        }
+        self.task.await.ok();
+    }
+}
+
+async fn open_gateway(token: &str) -> Result<Ws, Box<dyn std::error::Error + Send + Sync>> {
     let mut gateway = tokio::time::timeout(
         Duration::from_secs(30),
         GatewayClient::builder(token.to_string()).desktop().connect(),
@@ -184,8 +196,25 @@ async fn verify_gateway(
         }
     }
 
-    gateway.graceful_shutdown().await.ok();
-    Ok(())
+    let (shutdown, mut shutdown_rx) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = &mut shutdown_rx => break,
+                event = gateway.next_event() => {
+                    if event.is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+        gateway.graceful_shutdown().await.ok();
+    });
+
+    Ok(Ws {
+        shutdown: Some(shutdown),
+        task,
+    })
 }
 
 #[tokio::main]
@@ -197,18 +226,18 @@ async fn main() {
         .trim()
         .to_string();
 
+    let ws = match open_gateway(&token).await {
+        Ok(ws) => ws,
+        Err(e) => {
+            eprintln!("[check] gateway failed, nothing sent: {e}");
+            return;
+        }
+    };
+    println!("[check] gateway reached READY");
+
     let rest = RestClient::connect(token.clone(), None, None, None, None)
         .await
         .expect("rest connect");
-
-    let claiming = cli.claim_games > 0 || cli.claim_total_hours > 0.0;
-    if claiming && !cli.claim_dry_run {
-        if let Err(e) = verify_gateway(&token).await {
-            eprintln!("[check] gateway verification failed, nothing posted: {e}");
-            return;
-        }
-        println!("[check] gateway reached READY, token valid - posting");
-    }
 
     if cli.claim_total_hours > 0.0 {
         let games = if cli.claim_games > 0 { cli.claim_games } else { 115 };
@@ -227,6 +256,7 @@ async fn main() {
         {
             eprintln!("[science] {e}");
         }
+        ws.close().await;
         return;
     }
 
@@ -242,6 +272,7 @@ async fn main() {
         {
             eprintln!("[science] {e}");
         }
+        ws.close().await;
         return;
     }
 
@@ -416,6 +447,7 @@ async fn main() {
     gateway.clear_game_activity().await.ok();
     print_progress(&rest).await;
     gateway.graceful_shutdown().await.ok();
+    ws.close().await;
 }
 
 async fn stream_only(
