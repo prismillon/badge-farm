@@ -1,27 +1,12 @@
 use discord_client_rest::rest::{RequestProperties, RestClient};
+
 use discord_client_structs::structs::application::detectable::DetectableApplication;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use serde_json::{Value, json};
-use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MS_HOUR: f64 = 3_600_000.0;
-
-fn uuid() -> String {
-    let mut rng = rand::rng();
-    let hex: String = (0..32)
-        .map(|_| format!("{:x}", rng.random_range(0..16u8)))
-        .collect();
-    format!(
-        "{}-{}-{}-{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..32]
-    )
-}
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -41,6 +26,7 @@ struct Ids {
     hb: String,
     sig: String,
     seq: u64,
+    locale: String,
 }
 
 struct Session {
@@ -50,11 +36,12 @@ struct Session {
 }
 
 impl Ids {
-    fn new() -> Self {
+    fn new(locale: &str) -> Self {
         Self {
-            hb: uuid(),
-            sig: uuid(),
+            hb: uuid::Uuid::new_v4().to_string(),
+            sig: uuid::Uuid::new_v4().to_string(),
             seq: 0,
+            locale: locale.to_string(),
         }
     }
 
@@ -133,7 +120,7 @@ impl Ids {
                 "client_performance_memory": null,
                 "cpu_core_count": null,
                 "accessibility_features": 0,
-                "rendered_locale": "en-GB",
+                "rendered_locale": self.locale,
                 "launch_signature": self.sig,
                 "client_rtc_state": null,
                 "client_app_state": "focused",
@@ -150,7 +137,7 @@ impl Ids {
         session: &Session,
         hb_minutes: f64,
     ) -> Vec<Value> {
-        let session_id = uuid();
+        let session_id = uuid::Uuid::new_v4().to_string();
         let step = ((hb_minutes * 60_000.0) as i64).max(1);
         let mut events = Vec::new();
         events.push(self.heartbeat(
@@ -190,20 +177,6 @@ impl Ids {
         ));
         events
     }
-}
-
-async fn analytics_token(
-    rest: &RestClient,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let mut query = HashMap::new();
-    query.insert("with_analytics_token".to_string(), "true".to_string());
-    let me: Value = rest
-        .get("users/@me", Some(query), Some(RequestProperties::home()))
-        .await?;
-    me.get("analytics_token")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| "no analytics_token in users/@me response".into())
 }
 
 fn game_pool(apps: &[DetectableApplication]) -> Vec<(&DetectableApplication, &str)> {
@@ -337,7 +310,7 @@ pub async fn claim_plan(
     batch: usize,
     dry_run: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let analytics = analytics_token(rest).await?;
+    let analytics = rest.science().analytics_token().await?;
     let apps = rest.application().get_detectable_games().await?;
     let mut pool = game_pool(&apps);
     if pool.len() < games {
@@ -350,7 +323,7 @@ pub async fn claim_plan(
     let (mut plan, days_used) = schedule(&hours, session_max, spread_days, day_max)?;
     plan.sort_by_key(|s| s.start);
 
-    let mut ids = Ids::new();
+    let mut ids = Ids::new(rest.locale());
     let mut events = Vec::new();
     for session in &plan {
         let (app, exe) = pool[session.game];
@@ -395,7 +368,7 @@ pub async fn claim(
     batch: usize,
     dry_run: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let analytics = analytics_token(rest).await?;
+    let analytics = rest.science().analytics_token().await?;
     let apps = rest.application().get_detectable_games().await?;
     let mut pool = game_pool(&apps);
     if pool.is_empty() {
@@ -406,7 +379,7 @@ pub async fn claim(
 
     let duration = (hours * MS_HOUR) as i64;
     let start = now_ms() - duration;
-    let mut ids = Ids::new();
+    let mut ids = Ids::new(rest.locale());
     let mut events = Vec::new();
     for (app, exe) in &picked {
         let session = Session {

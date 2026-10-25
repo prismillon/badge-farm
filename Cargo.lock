@@ -137,6 +137,7 @@ dependencies = [
  "rand",
  "serde_json",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -531,7 +532,7 @@ dependencies = [
 [[package]]
 name = "discord_client_gateway"
 version = "0.2.0"
-source = "git+https://github.com/prismillon/discord-client-rs?rev=77a1def7444e79b43d597669d772f559c5db01b3#77a1def7444e79b43d597669d772f559c5db01b3"
+source = "git+https://github.com/prismillon/discord-client-rs?rev=a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d#a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d"
 dependencies = [
  "chrono",
  "discord_client_macros",
@@ -551,7 +552,7 @@ dependencies = [
 [[package]]
 name = "discord_client_macros"
 version = "0.2.0"
-source = "git+https://github.com/prismillon/discord-client-rs?rev=77a1def7444e79b43d597669d772f559c5db01b3#77a1def7444e79b43d597669d772f559c5db01b3"
+source = "git+https://github.com/prismillon/discord-client-rs?rev=a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d#a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d"
 dependencies = [
  "chrono",
  "convert_case",
@@ -564,7 +565,7 @@ dependencies = [
 [[package]]
 name = "discord_client_rest"
 version = "0.1.1"
-source = "git+https://github.com/prismillon/discord-client-rs?rev=77a1def7444e79b43d597669d772f559c5db01b3#77a1def7444e79b43d597669d772f559c5db01b3"
+source = "git+https://github.com/prismillon/discord-client-rs?rev=a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d#a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d"
 dependencies = [
  "base64",
  "chrono",
@@ -587,7 +588,7 @@ dependencies = [
 [[package]]
 name = "discord_client_structs"
 version = "0.2.0"
-source = "git+https://github.com/prismillon/discord-client-rs?rev=77a1def7444e79b43d597669d772f559c5db01b3#77a1def7444e79b43d597669d772f559c5db01b3"
+source = "git+https://github.com/prismillon/discord-client-rs?rev=a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d#a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d"
 dependencies = [
  "base64",
  "chrono",
@@ -602,7 +603,7 @@ dependencies = [
 [[package]]
 name = "discord_client_utils"
 version = "0.1.0"
-source = "git+https://github.com/prismillon/discord-client-rs?rev=77a1def7444e79b43d597669d772f559c5db01b3#77a1def7444e79b43d597669d772f559c5db01b3"
+source = "git+https://github.com/prismillon/discord-client-rs?rev=a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d#a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d"
 dependencies = [
  "discord_client_structs",
  "serde_json",
