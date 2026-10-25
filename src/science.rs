@@ -29,6 +29,13 @@ struct Ids {
     locale: String,
 }
 
+#[derive(Clone, Copy)]
+struct Game<'a> {
+    id: &'a str,
+    name: &'a str,
+    exe: &'a str,
+}
+
 struct Session {
     game: usize,
     start: i64,
@@ -52,9 +59,7 @@ impl Ids {
 
     fn heartbeat(
         &mut self,
-        game_id: &str,
-        name: &str,
-        exe: &str,
+        game: Game,
         session_id: &str,
         ts: i64,
         tracked: i64,
@@ -67,10 +72,10 @@ impl Ids {
                 "client_track_timestamp": ts,
                 "client_heartbeat_session_id": self.hb,
                 "event_sequence_number": self.next_seq(),
-                "game_id": game_id,
-                "game_name": name,
+                "game_id": game.id,
+                "game_name": game.name,
                 "game_metadata": null,
-                "game_executable": exe,
+                "game_executable": game.exe,
                 "game_detection_enabled": true,
                 "initial_heartbeat": initial,
                 "final_heartbeat": last,
@@ -85,15 +90,15 @@ impl Ids {
         })
     }
 
-    fn launch(&mut self, game_id: &str, name: &str, exe: &str, ts: i64) -> Value {
+    fn launch(&mut self, game: Game, ts: i64) -> Value {
         json!({
             "type": "launch_game",
             "properties": {
                 "client_track_timestamp": ts,
                 "client_heartbeat_session_id": self.hb,
                 "event_sequence_number": self.next_seq(),
-                "game": name,
-                "game_id": game_id,
+                "game": game.name,
+                "game_id": game.id,
                 "verified": true,
                 "elevated": false,
                 "is_launcher": false,
@@ -109,7 +114,7 @@ impl Ids {
                 "activity_status_shared_guilds": [],
                 "current_user_status": "online",
                 "game_detection_enabled": true,
-                "executable_path": exe,
+                "executable_path": game.exe,
                 "voice_channel_id": null,
                 "voice_channel_type": null,
                 "voice_channel_bitrate": null,
@@ -129,35 +134,17 @@ impl Ids {
         })
     }
 
-    fn session_events(
-        &mut self,
-        game_id: &str,
-        name: &str,
-        exe: &str,
-        session: &Session,
-        hb_minutes: f64,
-    ) -> Vec<Value> {
+    fn session_events(&mut self, game: Game, session: &Session, hb_minutes: f64) -> Vec<Value> {
         let session_id = uuid::Uuid::new_v4().to_string();
         let step = ((hb_minutes * 60_000.0) as i64).max(1);
         let mut events = Vec::new();
-        events.push(self.heartbeat(
-            game_id,
-            name,
-            exe,
-            &session_id,
-            session.start,
-            0,
-            true,
-            false,
-        ));
-        events.push(self.launch(game_id, name, exe, session.start));
+        events.push(self.heartbeat(game, &session_id, session.start, 0, true, false));
+        events.push(self.launch(game, session.start));
         let mut tracked = 0i64;
         while tracked + step < session.duration {
             tracked += step;
             events.push(self.heartbeat(
-                game_id,
-                name,
-                exe,
+                game,
                 &session_id,
                 session.start + tracked,
                 tracked,
@@ -166,9 +153,7 @@ impl Ids {
             ));
         }
         events.push(self.heartbeat(
-            game_id,
-            name,
-            exe,
+            game,
             &session_id,
             session.start + session.duration,
             session.duration,
@@ -282,7 +267,7 @@ async fn send(
 ) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
     let batch = batch.max(1);
     let total = events.len();
-    let requests = (total + batch - 1) / batch;
+    let requests = total.div_ceil(batch);
     let mut sent = 0usize;
     for (index, chunk) in events.chunks(batch).enumerate() {
         let body = json!({"token": analytics, "events": chunk});
@@ -291,7 +276,11 @@ async fn send(
             .await?;
         sent += chunk.len();
         if (index + 1) % 25 == 0 || index + 1 == requests {
-            println!("[science] {sent}/{total} events in {}/{} requests", index + 1, requests);
+            println!(
+                "[science] {sent}/{total} events in {}/{} requests",
+                index + 1,
+                requests
+            );
         }
         tokio::time::sleep(std::time::Duration::from_millis(120)).await;
     }
@@ -299,17 +288,31 @@ async fn send(
     Ok(sent)
 }
 
+pub struct PlanOptions {
+    pub total_hours: f64,
+    pub games: usize,
+    pub session_max: f64,
+    pub hb_minutes: f64,
+    pub spread_days: usize,
+    pub day_max: f64,
+    pub batch: usize,
+    pub dry_run: bool,
+}
+
 pub async fn claim_plan(
     rest: &RestClient,
-    total_hours: f64,
-    games: usize,
-    session_max: f64,
-    hb_minutes: f64,
-    spread_days: usize,
-    day_max: f64,
-    batch: usize,
-    dry_run: bool,
+    opts: PlanOptions,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let PlanOptions {
+        total_hours,
+        games,
+        session_max,
+        hb_minutes,
+        spread_days,
+        day_max,
+        batch,
+        dry_run,
+    } = opts;
     let analytics = rest.science().analytics_token().await?;
     let apps = rest.application().get_detectable_games().await?;
     let mut pool = game_pool(&apps);
@@ -327,7 +330,13 @@ pub async fn claim_plan(
     let mut events = Vec::new();
     for session in &plan {
         let (app, exe) = pool[session.game];
-        events.extend(ids.session_events(&app.id.to_string(), &app.name, exe, session, hb_minutes));
+        let id = app.id.to_string();
+        let game = Game {
+            id: &id,
+            name: &app.name,
+            exe,
+        };
+        events.extend(ids.session_events(game, session, hb_minutes));
     }
 
     let planned: f64 = plan.iter().map(|s| s.duration as f64 / MS_HOUR).sum();
@@ -337,7 +346,7 @@ pub async fn claim_plan(
         }
         _ => 0.0,
     };
-    let requests = (events.len() + batch.max(1) - 1) / batch.max(1);
+    let requests = events.len().div_ceil(batch.max(1));
     println!(
         "[science] plan: {} games, {:.0}h, {} sessions, {:.1}h/day over {} days, {} events, {} requests",
         games,
@@ -387,13 +396,13 @@ pub async fn claim(
             start,
             duration,
         };
-        events.extend(ids.session_events(
-            &app.id.to_string(),
-            &app.name,
+        let id = app.id.to_string();
+        let game = Game {
+            id: &id,
+            name: &app.name,
             exe,
-            &session,
-            hours * 60.0,
-        ));
+        };
+        events.extend(ids.session_events(game, &session, hours * 60.0));
     }
 
     println!(
