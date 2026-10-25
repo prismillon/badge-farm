@@ -6,12 +6,13 @@ edition = "2024"
 [workspace]
 
 [dependencies]
-discord_client_gateway = { git = "https://github.com/UwUDev/discord-client-rs", rev = "f4ae9060aad750ed439f50009d440e1a9e3d1ea9" }
-discord_client_rest = { git = "https://github.com/UwUDev/discord-client-rs", rev = "f4ae9060aad750ed439f50009d440e1a9e3d1ea9" }
-discord_client_structs = { git = "https://github.com/UwUDev/discord-client-rs", rev = "f4ae9060aad750ed439f50009d440e1a9e3d1ea9" }
+discord_client_gateway = { git = "https://github.com/prismillon/discord-client-rs", rev = "77a1def7444e79b43d597669d772f559c5db01b3" }
+discord_client_rest = { git = "https://github.com/prismillon/discord-client-rs", rev = "77a1def7444e79b43d597669d772f559c5db01b3" }
+discord_client_structs = { git = "https://github.com/prismillon/discord-client-rs", rev = "77a1def7444e79b43d597669d772f559c5db01b3" }
 tokio = { version = "1.45.0", features = ["rt-multi-thread", "macros", "time", "signal"] }
 rand = "0.9"
 clap = { version = "4", features = ["derive"] }
+serde_json = "1.0.140"
 
 [patch.crates-io]
 wreq = { git = "https://github.com/0x676e67/wreq", rev = "cd76bcdf1307153de289d34e072528bdf0510a3b" }
