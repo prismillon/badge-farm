@@ -6,9 +6,9 @@ edition = "2024"
 [workspace]
 
 [dependencies]
-discord_client_gateway = { git = "https://github.com/prismillon/discord-client-rs", rev = "a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d" }
-discord_client_rest = { git = "https://github.com/prismillon/discord-client-rs", rev = "a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d" }
-discord_client_structs = { git = "https://github.com/prismillon/discord-client-rs", rev = "a6d67fb4d44deb55c4fd38c6faae73db1ad26e5d" }
+discord_client_gateway = { git = "https://github.com/UwUDev/discord-client-rs", rev = "80376da11ee13f1d3950cb495a1c93a378c778e7" }
+discord_client_rest = { git = "https://github.com/UwUDev/discord-client-rs", rev = "80376da11ee13f1d3950cb495a1c93a378c778e7" }
+discord_client_structs = { git = "https://github.com/UwUDev/discord-client-rs", rev = "80376da11ee13f1d3950cb495a1c93a378c778e7" }
 tokio = { version = "1.45.0", features = ["rt-multi-thread", "macros", "time", "signal", "sync"] }
 rand = "0.9"
 uuid = { version = "1", features = ["v4"] }
