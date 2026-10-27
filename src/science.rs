@@ -45,10 +45,10 @@ struct Session {
 }
 
 impl Ids {
-    fn new(locale: &str) -> Self {
+    fn new(locale: &str, heartbeat_session_id: String, launch_signature: String) -> Self {
         Self {
-            hb: uuid::Uuid::new_v4().to_string(),
-            sig: uuid::Uuid::new_v4().to_string(),
+            hb: heartbeat_session_id,
+            sig: launch_signature,
             seq: 0,
             locale: locale.to_string(),
         }
@@ -332,7 +332,7 @@ pub async fn claim_plan(
     let (mut plan, days_used) = schedule(&hours, session_max, spread_days, day_max)?;
     plan.sort_by_key(|s| s.start);
 
-    let mut ids = Ids::new(rest.locale());
+    let mut ids = Ids::new(rest.locale(), rest.heartbeat_session_id(), rest.launch_signature());
     let machine = crate::fingerprint::machine_guid();
     let user = rest.user_id.to_string();
     let mut events = Vec::new();
@@ -404,7 +404,7 @@ pub async fn claim(
 
     let duration = (hours * MS_HOUR) as i64;
     let start = now_ms() - duration;
-    let mut ids = Ids::new(rest.locale());
+    let mut ids = Ids::new(rest.locale(), rest.heartbeat_session_id(), rest.launch_signature());
     let machine = crate::fingerprint::machine_guid();
     let user = rest.user_id.to_string();
     let mut events = Vec::new();
