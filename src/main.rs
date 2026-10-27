@@ -5,6 +5,7 @@ use discord_client_rest::rest::RestClient;
 use std::time::Duration;
 
 mod cli;
+mod fingerprint;
 mod gateway;
 mod science;
 mod stream;
@@ -52,6 +53,7 @@ async fn main() {
             spread_days: cli.claim_spread_days,
             day_max: cli.claim_day_max_h,
             batch: cli.claim_batch,
+            delay_ms: cli.claim_batch_delay_ms,
             dry_run: cli.claim_dry_run,
         };
         if let Err(e) = science::claim_plan(&rest, opts).await {
@@ -68,6 +70,7 @@ async fn main() {
             cli.claim_hours,
             cli.claim_heartbeat_min,
             cli.claim_batch,
+            cli.claim_batch_delay_ms,
             cli.claim_dry_run,
         )
         .await

@@ -56,6 +56,10 @@ pub struct Cli {
     #[arg(long, default_value_t = 50)]
     pub claim_batch: usize,
 
+    /// Milliseconds to wait between science requests
+    #[arg(long, default_value_t = 1000)]
+    pub claim_batch_delay_ms: u64,
+
     /// Build the science payload and print it without posting
     #[arg(long)]
     pub claim_dry_run: bool,

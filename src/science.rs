@@ -1,3 +1,4 @@
+use crate::fingerprint;
 use discord_client_rest::rest::{RequestProperties, RestClient};
 
 use discord_client_structs::structs::application::detectable::DetectableApplication;
@@ -34,6 +35,7 @@ struct Game<'a> {
     id: &'a str,
     name: &'a str,
     exe: &'a str,
+    fp: &'a str,
 }
 
 struct Session {
@@ -115,6 +117,7 @@ impl Ids {
                 "current_user_status": "online",
                 "game_detection_enabled": true,
                 "executable_path": game.exe,
+                "executable_fingerprint": game.fp,
                 "voice_channel_id": null,
                 "voice_channel_type": null,
                 "voice_channel_bitrate": null,
@@ -264,6 +267,7 @@ async fn send(
     analytics: &str,
     events: Vec<Value>,
     batch: usize,
+    delay_ms: u64,
 ) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
     let batch = batch.max(1);
     let total = events.len();
@@ -282,7 +286,7 @@ async fn send(
                 requests
             );
         }
-        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
     }
     println!("[science] done: {sent} events in {requests} requests");
     Ok(sent)
@@ -296,6 +300,7 @@ pub struct PlanOptions {
     pub spread_days: usize,
     pub day_max: f64,
     pub batch: usize,
+    pub delay_ms: u64,
     pub dry_run: bool,
 }
 
@@ -311,6 +316,7 @@ pub async fn claim_plan(
         spread_days,
         day_max,
         batch,
+        delay_ms,
         dry_run,
     } = opts;
     let analytics = rest.science().analytics_token().await?;
@@ -327,14 +333,18 @@ pub async fn claim_plan(
     plan.sort_by_key(|s| s.start);
 
     let mut ids = Ids::new(rest.locale());
+    let machine = crate::fingerprint::machine_guid();
+    let user = rest.user_id.to_string();
     let mut events = Vec::new();
     for session in &plan {
         let (app, exe) = pool[session.game];
         let id = app.id.to_string();
+        let fp = fingerprint::for_game(&id, exe, &machine, &user);
         let game = Game {
             id: &id,
             name: &app.name,
             exe,
+            fp: &fp,
         };
         events.extend(ids.session_events(game, session, hb_minutes));
     }
@@ -360,13 +370,17 @@ pub async fn claim_plan(
     println!("[science] history spans {span_days:.0} days (dry_run={dry_run})");
 
     if dry_run {
+        let sample = events
+            .iter()
+            .find(|e| e["type"] == "launch_game")
+            .unwrap_or(&events[0]);
         println!(
-            "[science] first event: {}",
-            serde_json::to_string_pretty(&events[0]).unwrap_or_default()
+            "[science] sample event: {}",
+            serde_json::to_string_pretty(sample).unwrap_or_default()
         );
         return Ok(());
     }
-    send(rest, &analytics, events, batch).await?;
+    send(rest, &analytics, events, batch, delay_ms).await?;
     Ok(())
 }
 
@@ -376,6 +390,7 @@ pub async fn claim(
     hours: f64,
     hb_minutes: f64,
     batch: usize,
+    delay_ms: u64,
     dry_run: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let analytics = rest.science().analytics_token().await?;
@@ -390,6 +405,8 @@ pub async fn claim(
     let duration = (hours * MS_HOUR) as i64;
     let start = now_ms() - duration;
     let mut ids = Ids::new(rest.locale());
+    let machine = crate::fingerprint::machine_guid();
+    let user = rest.user_id.to_string();
     let mut events = Vec::new();
     for (app, exe) in &picked {
         let session = Session {
@@ -398,10 +415,12 @@ pub async fn claim(
             duration,
         };
         let id = app.id.to_string();
+        let fp = fingerprint::for_game(&id, exe, &machine, &user);
         let game = Game {
             id: &id,
             name: &app.name,
             exe,
+            fp: &fp,
         };
         events.extend(ids.session_events(game, &session, hb_minutes));
     }
@@ -415,12 +434,16 @@ pub async fn claim(
         dry_run
     );
     if dry_run {
+        let sample = events
+            .iter()
+            .find(|e| e["type"] == "launch_game")
+            .unwrap_or(&events[0]);
         println!(
-            "[science] first event: {}",
-            serde_json::to_string_pretty(&events[0]).unwrap_or_default()
+            "[science] sample event: {}",
+            serde_json::to_string_pretty(sample).unwrap_or_default()
         );
         return Ok(());
     }
-    send(rest, &analytics, events, batch).await?;
+    send(rest, &analytics, events, batch, delay_ms).await?;
     Ok(())
 }
